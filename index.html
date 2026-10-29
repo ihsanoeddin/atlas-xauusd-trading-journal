@@ -81,6 +81,13 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
 .toast{position:fixed;right:20px;bottom:20px;background:#183626;border:1px solid #2d6c49;color:#d9ffe8;border-radius:10px;padding:12px 16px;box-shadow:0 10px 35px #0007;display:none;z-index:5}
 @media(max-width:1000px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
 @media(max-width:650px){.shell{padding:16px}.topbar{align-items:flex-start;flex-direction:column}.cards{gap:9px}.card{padding:13px;min-height:105px}.value{font-size:21px}.lower-grid{grid-template-columns:1fr}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.field.full{grid-column:1/-1}.sectionhead{align-items:flex-start;flex-direction:column}.chartwrap{height:220px}}
+
+.auth-panel{max-width:520px;margin:24px auto 30px;padding:22px;background:linear-gradient(145deg,rgba(23,30,36,.97),rgba(17,22,27,.97));border:1px solid var(--border);border-radius:var(--radius)}
+.auth-panel h2{font-size:17px;margin:0 0 6px}.auth-panel p{font-size:12px;color:var(--muted);margin-bottom:18px}
+.auth-grid{display:grid;gap:12px}.auth-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.auth-status{font-size:12px;color:var(--muted);margin-top:12px;overflow-wrap:anywhere}.auth-status.error{color:var(--red)}.auth-status.success{color:var(--green)}
+.userbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#10161a;font-size:12px;color:var(--muted)}
+[hidden]{display:none!important}
+
 </style>
 </head>
 <body>
@@ -90,7 +97,7 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
       <div class="logo">A</div>
       <div><h1>ATLAS <span style="color:var(--green)">/</span> TRADING JOURNAL</h1><div class="sub">XAUUSD PERFORMANCE TERMINAL · MANUAL JOURNAL</div></div>
     </div>
-    <div class="actions">
+    <div class="actions" id="journalActions" hidden>
       <button class="btn" id="exportBtn">Export CSV</button>
       <button class="btn" id="importBtn">Import CSV</button>
       <button class="btn" id="balanceBtn">Starting balance</button>
@@ -99,7 +106,20 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
     </div>
   </header>
 
-  <div class="notice"><strong>DEMO / PRIVACY NOTE</strong> — Statistik hanya berasal dari transaksi yang kamu masukkan. Data awal tidak berisi transaksi nyata. Data disimpan di browser ini (localStorage), tidak otomatis tersinkron atau tampil ke pengunjung website. Jangan masukkan nomor akun, kredensial broker, atau data sensitif. Untuk portfolio publik, publikasikan hanya dataset yang memang ingin kamu bagikan.</div>
+  <section class="auth-panel" id="authGate">
+    <h2>Private ATLAS account</h2>
+    <p>Login untuk menyimpan jurnal ke Supabase dan mengaksesnya dari perangkat lain. Transaksi tetap privat melalui Row Level Security.</p>
+    <div class="auth-grid">
+      <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" placeholder="email@example.com" required></div>
+      <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" placeholder="Minimal 6 karakter" required></div>
+    </div>
+    <div class="auth-actions"><button class="btn primary" id="loginBtn" type="button">Login</button><button class="btn" id="signupBtn" type="button">Buat akun</button></div>
+    <div id="authStatus" class="auth-status" role="status">Hubungkan akun Supabase untuk membuka jurnal.</div>
+  </section>
+
+  <div id="journalApp" hidden>
+    <div class="userbar"><span id="signedInLabel">Signed in</span><button class="btn" id="logoutBtn" type="button">Logout</button></div>
+  <div class="notice"><strong>PRIVATE JOURNAL</strong> — Transaksi dimuat dan disimpan ke akun Supabase yang sedang login. Data tidak dipublikasikan. Data lama dari browser dapat ditawarkan untuk migrasi saat login pertama.</div><strong>DEMO / PRIVACY NOTE</strong> — Statistik hanya berasal dari transaksi yang kamu masukkan. Data awal tidak berisi transaksi nyata. Data disimpan di browser ini (localStorage), tidak otomatis tersinkron atau tampil ke pengunjung website. Jangan masukkan nomor akun, kredensial broker, atau data sensitif. Untuk portfolio publik, publikasikan hanya dataset yang memang ingin kamu bagikan.</div>
 
   <div class="sectionhead"><div><h2>Performance overview</h2><p>Closed trades only · XAUUSD · USD</p></div>
     <div class="filters"><label class="sub" for="periodFilter">Period</label><select id="periodFilter"><option value="all">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="ytd">Year to date</option></select></div>
@@ -124,6 +144,7 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
   </section>
 
   <footer><span>ATLAS Trading Journal · Personal analytics tool</span><span>Not investment advice · Verify calculations against broker statements</span></footer>
+  </div>
 </div>
 
 <dialog id="tradeDialog">
@@ -151,12 +172,18 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
 </dialog>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
   "use strict";
   const STORAGE_KEY = "atlas-xauusd-journal-v1";
   const START_KEY = "atlas-xauusd-starting-balance-v1";
+  const SUPABASE_URL = "https://jdatajunuzxqbaoaettw.supabase.co";
+  const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_15bqOf6qk2pQytWLX11Frw_yOPxwaUq";
   const $ = id => document.getElementById(id);
+  const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  let currentUser = null;
+  let authBusy = false;
   let trades = loadTrades();
   let editingId = null;
   let toastTimer;
@@ -174,6 +201,69 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
       Number.isFinite(Number(t.swap));
   }
   function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(trades)); }
+  function toDatabaseTrade(t) {
+    return {
+      id: t.id, user_id: currentUser.id, trade_date: t.date, symbol: "XAUUSD", side: t.side,
+      lot: num(t.lot), entry_price: t.entry === "" || t.entry == null ? null : num(t.entry),
+      exit_price: t.exit === "" || t.exit == null ? null : num(t.exit), risk_usd: num(t.risk),
+      gross_pl: num(t.gross), commission: num(t.commission), swap: num(t.swap),
+      strategy: t.strategy || "", trading_session: t.session || "", execution: t.mood || "", notes: t.notes || ""
+    };
+  }
+  function fromDatabaseTrade(t) {
+    return { id: t.id, date: t.trade_date, side: t.side, lot: Number(t.lot),
+      entry: t.entry_price == null ? null : Number(t.entry_price), exit: t.exit_price == null ? null : Number(t.exit_price),
+      risk: Number(t.risk_usd || 0), gross: Number(t.gross_pl), commission: Number(t.commission || 0),
+      swap: Number(t.swap || 0), strategy: t.strategy || "", session: t.trading_session || "",
+      mood: t.execution || "", notes: t.notes || "" };
+  }
+  async function fetchCloudTrades() {
+    const { data, error } = await supabaseClient.from("trades").select("*").eq("user_id", currentUser.id).order("trade_date", { ascending: true });
+    if (error) throw error;
+    return (data || []).map(fromDatabaseTrade);
+  }
+  async function saveCloudTrade(t) {
+    const { error } = await supabaseClient.from("trades").upsert(toDatabaseTrade(t), { onConflict: "id" });
+    if (error) throw error;
+  }
+  async function migrateLocalTrades(localTrades) {
+    if (!localTrades.length) return 0;
+    const payload = localTrades.map(toDatabaseTrade);
+    const { error } = await supabaseClient.from("trades").insert(payload);
+    if (error) throw error;
+    return payload.length;
+  }
+  function setAuthStatus(message, type="") {
+    const el = $("authStatus"); if (!el) return;
+    el.textContent = message; el.className = "auth-status" + (type ? " " + type : "");
+  }
+  async function activateSession(session) {
+    currentUser = session?.user || null;
+    if (!currentUser) {
+      $("authGate").hidden = false; $("journalApp").hidden = true; $("journalActions").hidden = true;
+      $("signedInLabel").textContent = "Signed out";
+      return;
+    }
+    $("authGate").hidden = true; $("journalApp").hidden = false; $("journalActions").hidden = false;
+    $("signedInLabel").textContent = "Signed in: " + currentUser.email;
+    try {
+      let cloudTrades = await fetchCloudTrades();
+      const localTrades = loadTrades();
+      if (cloudTrades.length === 0 && localTrades.length > 0) {
+        const migrate = confirm(`Ditemukan ${localTrades.length} transaksi lama di browser ini. Pindahkan ke akun Supabase ini? Pilih OK untuk migrasi, atau Cancel untuk mulai dari jurnal cloud yang kosong.`);
+        if (migrate) {
+          const count = await migrateLocalTrades(localTrades);
+          cloudTrades = await fetchCloudTrades();
+          showToast(`${count} transaksi lama berhasil dimigrasikan.`);
+        }
+      }
+      trades = cloudTrades;
+      render();
+    } catch (err) {
+      setAuthStatus("Gagal memuat jurnal: " + (err.message || "Kesalahan Supabase"), "error");
+      showToast("Gagal memuat data cloud. Periksa tabel trades dan RLS.");
+    }
+  }
   function num(v) { return Number(v || 0); }
   function net(t) { return num(t.gross) + num(t.commission) + num(t.swap); }
   function money(v, digits=2) {
@@ -343,13 +433,15 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
     if(!Number.isFinite(risk)||risk<0)throw Error("Initial risk tidak boleh negatif.");
     return {id:editingId||crypto.randomUUID(),date,side:$("side").value,lot,entry,exit,risk,gross,commission:num($("commission").value),swap:num($("swap").value),strategy:$("strategy").value.trim(),session:$("session").value,mood:$("mood").value,notes:$("notes").value.trim()};
   }
-  $("tradeForm").addEventListener("submit",e=>{
+  $("tradeForm").addEventListener("submit",async e=>{
     e.preventDefault();
     try{
+      if (!currentUser) throw Error("Login terlebih dahulu untuk menyimpan transaksi.");
       const t=readForm();
+      await saveCloudTrade(t);
       if(editingId)trades=trades.map(old=>old.id===editingId?t:old);else trades.push(t);
-      persist();$("tradeDialog").close();render();showToast("Trade saved.");
-    }catch(err){showToast(err.message||"Invalid trade data.");}
+      $("tradeDialog").close();render();showToast("Trade saved to Supabase.");
+    }catch(err){showToast(err.message||"Gagal menyimpan transaksi.");}
   });
   $("addBtn").addEventListener("click",openNew);
   $("closeDialog").addEventListener("click",()=>$("tradeDialog").close());
@@ -357,7 +449,7 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
   $("tradeRows").addEventListener("click",e=>{
     const edit=e.target.closest("[data-edit]"),del=e.target.closest("[data-delete]");
     if(edit)openEdit(edit.dataset.edit);
-    if(del){const t=trades.find(x=>x.id===del.dataset.delete);if(t&&confirm(`Delete trade on ${t.date}?`)){trades=trades.filter(x=>x.id!==t.id);persist();render();showToast("Trade deleted.");}}
+    if(del){const t=trades.find(x=>x.id===del.dataset.delete);if(t&&confirm(`Delete trade on ${t.date}?`)){(async()=>{try{const {error}=await supabaseClient.from("trades").delete().eq("id",t.id).eq("user_id",currentUser.id);if(error)throw error;trades=trades.filter(x=>x.id!==t.id);render();showToast("Trade deleted from Supabase.");}catch(err){showToast("Delete gagal: "+(err.message||"Supabase error"));}})();}}
   });
   ["periodFilter","resultFilter","searchTrades"].forEach(id=>$(id).addEventListener(id==="searchTrades"?"input":"change",render));
   $("exportBtn").addEventListener("click",()=>{
@@ -384,7 +476,7 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
         if(!/^\d{4}-\d{2}-\d{2}$/.test(get("date"))||!["BUY","SELL"].includes(side)||!Number.isFinite(lot)||lot<=0||!Number.isFinite(gross))throw Error(`Data tidak valid pada baris ${i+1}.`);
         imported.push({id:crypto.randomUUID(),date:get("date"),side,lot,entry:get("entry")?Number(get("entry")):null,exit:get("exit")?Number(get("exit")):null,risk:Number(get("risk")||0),gross,commission:Number(get("commission")||0),swap:Number(get("swap")||0),strategy:get("strategy"),session:get("session"),mood:get("mood"),notes:get("notes")});
       }
-      if(confirm(`Import ${imported.length} trade(s)? Pilih OK untuk menambahkan ke data saat ini; Cancel untuk membatalkan.`)){trades.push(...imported);persist();render();showToast(`${imported.length} trade(s) imported.`);}
+      if(confirm(`Import ${imported.length} trade(s) ke akun Supabase ini?`)){if(!currentUser)throw Error("Login terlebih dahulu.");const payload=imported.map(toDatabaseTrade);const {error}=await supabaseClient.from("trades").insert(payload);if(error)throw error;trades.push(...imported);render();showToast(`${imported.length} trade(s) imported to Supabase.`);}
     }catch(err){alert("Import gagal: "+err.message);}
     finally{$("csvFile").value="";}
   });
@@ -413,8 +505,39 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
     if(!Number.isFinite(n)||n<=0){showToast("Starting balance must be greater than zero.");return;}
     localStorage.setItem(START_KEY,String(n));render();showToast("Starting balance updated.");
   });
+  // Supabase email/password authentication.
+  $("loginBtn").addEventListener("click", async () => {
+    if (!supabaseClient) { setAuthStatus("Library Supabase gagal dimuat. Periksa koneksi internet/CDN.", "error"); return; }
+    const email=$("authEmail").value.trim(), password=$("authPassword").value;
+    if(!email||!password){setAuthStatus("Masukkan email dan password.","error");return;}
+    if(authBusy)return;authBusy=true;$("loginBtn").disabled=true;$("signupBtn").disabled=true;
+    try { const {data,error}=await supabaseClient.auth.signInWithPassword({email,password}); if(error)throw error; await activateSession(data.session); setAuthStatus("Login berhasil.","success"); }
+    catch(err){setAuthStatus("Login gagal: "+(err.message||"Periksa email dan password."),"error");}
+    finally{authBusy=false;$("loginBtn").disabled=false;$("signupBtn").disabled=false;}
+  });
+  $("signupBtn").addEventListener("click", async () => {
+    if (!supabaseClient) { setAuthStatus("Library Supabase gagal dimuat. Periksa koneksi internet/CDN.", "error"); return; }
+    const email=$("authEmail").value.trim(), password=$("authPassword").value;
+    if(!email||!password){setAuthStatus("Masukkan email dan password.","error");return;}
+    if(password.length<6){setAuthStatus("Password minimal 6 karakter.","error");return;}
+    if(authBusy)return;authBusy=true;$("loginBtn").disabled=true;$("signupBtn").disabled=true;
+    try { const {data,error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+window.location.pathname}}); if(error)throw error; if(data.session){await activateSession(data.session);setAuthStatus("Akun dibuat dan login berhasil.","success");}else{setAuthStatus("Akun dibuat. Periksa email untuk konfirmasi, lalu kembali ke sini dan login.","success");} }
+    catch(err){setAuthStatus("Pembuatan akun gagal: "+(err.message||"Supabase error"),"error");}
+    finally{authBusy=false;$("loginBtn").disabled=false;$("signupBtn").disabled=false;}
+  });
+  $("logoutBtn").addEventListener("click", async () => {
+    try { const {error}=await supabaseClient.auth.signOut(); if(error)throw error; currentUser=null;trades=[];render();$("authGate").hidden=false;$("journalApp").hidden=true;$("journalActions").hidden=true;setAuthStatus("Kamu sudah logout.","success"); }
+    catch(err){showToast("Logout gagal: "+(err.message||"Supabase error"));}
+  });
+  if (supabaseClient) {
+    supabaseClient.auth.getSession().then(({data,error})=>{if(error){setAuthStatus(error.message,"error");return;}activateSession(data.session);}).catch(err=>setAuthStatus("Gagal memeriksa sesi: "+err.message,"error"));
+    supabaseClient.auth.onAuthStateChange((_event, session)=>{setTimeout(()=>{if(!session && currentUser)activateSession(null);else if(session && session.user && session.user.id!==currentUser?.id)activateSession(session);},0);});
+  } else {
+    setAuthStatus("Supabase JS belum termuat. Pastikan internet aktif dan CDN tidak diblokir.","error");
+  }
+  // Charts remain blank until a user session opens the private journal.
   render();
-  window.addEventListener("resize",()=>renderCharts(metrics(filteredByPeriod())));
+  window.addEventListener("resize",()=>{if(!$("journalApp").hidden)renderCharts(metrics(filteredByPeriod()));});
 })();
 </script>
 </body>
