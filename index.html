@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="XAUUSD trading journal and performance dashboard.">
-<title>ATLAS — XAUUSD Trading Journal</title>
+<title>Ihsanoeddin — XAUUSD Trading Journal</title>
 <style>
 :root{
   --bg:#0b0e11;--panel:#12171c;--panel2:#171e24;--border:#27313a;
@@ -94,9 +94,13 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
 <div class="shell">
   <header class="topbar">
     <div class="brand">
-      <div class="logo">A</div>
-      <div><h1>ATLAS <span style="color:var(--green)">/</span> TRADING JOURNAL</h1><div class="sub">XAUUSD PERFORMANCE TERMINAL · MANUAL JOURNAL</div></div>
-    </div>
+     
+<div class="logo">I</div>
+<div>
+  <h1>IHSANOEDDIN <span style="color:var(--green)">/</span> TRADING JOURNAL</h1>
+  <div class="sub">XAUUSD PERFORMANCE TERMINAL · MANUAL JOURNAL</div>
+</div>
+
     <div class="actions" id="journalActions" hidden>
       <button class="btn" id="exportBtn">Export CSV</button>
       <button class="btn" id="importBtn">Import CSV</button>
@@ -107,7 +111,7 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
   </header>
 
   <section class="auth-panel" id="authGate">
-    <h2>Private ATLAS account</h2>
+    <h2>Ihsanoeddin Trading Journal</h2>
     <p>Login untuk menyimpan jurnal ke Supabase dan mengaksesnya dari perangkat lain. Transaksi tetap privat melalui Row Level Security.</p>
     <div class="auth-grid">
       <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" placeholder="email@example.com" required></div>
@@ -123,14 +127,6 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
     <span id="signedInLabel">Signed in</span>
     <button class="btn" id="logoutBtn" type="button">Logout</button>
   </div>
-
-  <div class="notice">
-    <strong>PRIVATE JOURNAL</strong> — Transaksi dimuat dan disimpan ke akun Supabase yang sedang login. Data tidak dipublikasikan. Data lama dari browser dapat ditawarkan untuk migrasi saat login pertama.
-    <br><br>
-    <strong>DEMO / PRIVACY NOTE</strong> — Statistik hanya berasal dari transaksi yang kamu masukkan. Data awal tidak berisi transaksi nyata. Data disimpan di browser ini (localStorage), tidak otomatis tersinkron atau tampil ke pengunjung website. Jangan masukkan nomor akun, kredensial broker, atau data sensitif. Untuk portfolio publik, publikasikan hanya dataset yang memang ingin kamu bagikan.
-  </div>
-
-
 
   <div class="sectionhead"><div><h2>Performance overview</h2><p>Closed trades only · XAUUSD · USD</p></div>
     <div class="filters"><label class="sub" for="periodFilter">Period</label><select id="periodFilter"><option value="all">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="ytd">Year to date</option></select></div>
