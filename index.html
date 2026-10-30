@@ -117,9 +117,20 @@ footer{color:var(--muted);font-size:11px;margin:28px 0 5px;display:flex;justify-
     <div id="authStatus" class="auth-status" role="status">Hubungkan akun Supabase untuk membuka jurnal.</div>
   </section>
 
-  <div id="journalApp" hidden>
-    <div class="userbar"><span id="signedInLabel">Signed in</span><button class="btn" id="logoutBtn" type="button">Logout</button></div>
-  <div class="notice"><strong>PRIVATE JOURNAL</strong> — Transaksi dimuat dan disimpan ke akun Supabase yang sedang login. Data tidak dipublikasikan. Data lama dari browser dapat ditawarkan untuk migrasi saat login pertama.</div><strong>DEMO / PRIVACY NOTE</strong> — Statistik hanya berasal dari transaksi yang kamu masukkan. Data awal tidak berisi transaksi nyata. Data disimpan di browser ini (localStorage), tidak otomatis tersinkron atau tampil ke pengunjung website. Jangan masukkan nomor akun, kredensial broker, atau data sensitif. Untuk portfolio publik, publikasikan hanya dataset yang memang ingin kamu bagikan.</div>
+  
+<div id="journalApp" hidden>
+  <div class="userbar">
+    <span id="signedInLabel">Signed in</span>
+    <button class="btn" id="logoutBtn" type="button">Logout</button>
+  </div>
+
+  <div class="notice">
+    <strong>PRIVATE JOURNAL</strong> — Transaksi dimuat dan disimpan ke akun Supabase yang sedang login. Data tidak dipublikasikan. Data lama dari browser dapat ditawarkan untuk migrasi saat login pertama.
+    <br><br>
+    <strong>DEMO / PRIVACY NOTE</strong> — Statistik hanya berasal dari transaksi yang kamu masukkan. Data awal tidak berisi transaksi nyata. Data disimpan di browser ini (localStorage), tidak otomatis tersinkron atau tampil ke pengunjung website. Jangan masukkan nomor akun, kredensial broker, atau data sensitif. Untuk portfolio publik, publikasikan hanya dataset yang memang ingin kamu bagikan.
+  </div>
+
+
 
   <div class="sectionhead"><div><h2>Performance overview</h2><p>Closed trades only · XAUUSD · USD</p></div>
     <div class="filters"><label class="sub" for="periodFilter">Period</label><select id="periodFilter"><option value="all">All time</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="ytd">Year to date</option></select></div>
