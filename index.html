@@ -523,35 +523,151 @@ function renderTrades() {
     if(del){const t=trades.find(x=>x.id===del.dataset.delete);if(t&&confirm(`Delete trade on ${t.date}?`)){(async()=>{try{const {error}=await supabaseClient.from("trades").delete().eq("id",t.id).eq("user_id",currentUser.id);if(error)throw error;trades=trades.filter(x=>x.id!==t.id);render();showToast("Trade deleted from Supabase.");}catch(err){showToast("Delete gagal: "+(err.message||"Supabase error"));}})();}}
   });
   ["periodFilter","resultFilter","searchTrades"].forEach(id=>$(id).addEventListener(id==="searchTrades"?"input":"change",render));
-  $("exportBtn").addEventListener("click",()=>{
-    const headers=["date","side","status","lot","entry","exit","stopLoss","takeProfit","risk","gross","commission","swap","net","strategy","session","mood","notes"];
-    const rows=trades.map(t=>headers.map(k=>csvEscape(k==="net"?net(t):t[k]??"")).join(","));
-    const blob=new Blob([[headers.join(","),...rows].join("\r\n")],{type:"text/csv;charset=utf-8;"}),url=URL.createObjectURL(blob);
-    const a=document.createElement("a");a.href=url;a.download="ihsanoeddin-trading-journal.csv";a.click();URL.revokeObjectURL(url);showToast("CSV exported.");
-  });
-  function csvEscape(v){const s=String(v??"");return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
-  $("importBtn").addEventListener("click",()=>$("csvFile").click());
-  $("csvFile").addEventListener("change",async e=>{
-    const file=e.target.files[0];if(!file)return;
-    try{
-      const text=await file.text(),rows=parseCSV(text);
-      if(rows.length<2)throw Error("CSV tidak memiliki baris transaksi.");
-      const head=rows[0].map(s=>s.trim().toLowerCase()),idx=k=>head.indexOf(k);
-      const required=["date","side","lot","gross"];
-      if(required.some(k=>idx(k)<0))throw Error("Kolom wajib: date, side, lot, gross.");
-      const imported=[];
-      for(let i=1;i<rows.length;i++){
-        const r=rows[i];if(r.every(x=>!x.trim()))continue;
-        const get=k=>idx(k)>=0?(r[idx(k)]||"").trim():"";
-        const side=get("side").toUpperCase(),lot=Number(get("lot")),gross=Number(get("gross"));
-        if(!/^\d{4}-\d{2}-\d{2}$/.test(get("date"))||!["BUY","SELL"].includes(side)||!Number.isFinite(lot)||lot<=0||!Number.isFinite(gross))throw Error(`Data tidak valid pada baris ${i+1}.`);
-        const status=get("status").toLowerCase()==="open"?"open":"closed";
-        imported.push({id:crypto.randomUUID(),date:get("date"),side,status,lot,entry:get("entry")?Number(get("entry")):null,exit:get("exit")?Number(get("exit")):null,stopLoss:get("stoploss")?Number(get("stoploss")):null,takeProfit:get("takeprofit")?Number(get("takeprofit")):null,risk:Number(get("risk")||0),gross:status==="open"?0:gross,commission:Number(get("commission")||0),swap:Number(get("swap")||0),strategy:get("strategy"),session:get("session"),mood:get("mood"),notes:get("notes")});
+
+$("exportBtn").addEventListener("click",()=>{
+  const headers=["id","date","side","status","lot","entry","exit","stopLoss","takeProfit","risk","gross","commission","swap","net","strategy","session","mood","notes"];
+
+  const rows=trades.map(t=>
+    headers.map(k=>csvEscape(k==="net"?net(t):t[k]??"")).join(",")
+  );
+
+  const blob=new Blob(
+    [[headers.join(","),...rows].join("\r\n")],
+    {type:"text/csv;charset=utf-8;"}
+  );
+
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="ihsanoeddin-trading-journal.csv";
+  a.click();
+
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  showToast("CSV exported.");
+});
+
+function csvEscape(value){
+  const text=String(value??"");
+  return '"' + text.replace(/"/g,'""') + '"';
+}
+
+$("importBtn").addEventListener("click",()=>{
+  $("csvFile").click();
+});
+
+function tradeFingerprint(t){
+  return JSON.stringify([
+    t.date,t.side,t.status,t.lot,t.entry,t.exit,
+    t.stopLoss,t.takeProfit,t.risk,t.gross,
+    t.commission,t.swap,t.strategy,t.session,t.mood,t.notes
+  ]);
+}
+
+$("csvFile").addEventListener("change",async e=>{
+  try{
+    if(!currentUser) throw Error("Login terlebih dahulu.");
+
+    const file=e.target.files[0];
+    if(!file) return;
+
+    const text=await file.text();
+    const rows=parseCSV(text);
+
+    if(rows.length<2) throw Error("CSV tidak memiliki data transaksi.");
+
+    const headers=rows[0].map(h=>h.trim().replace(/^\uFEFF/,""));
+    const idx=name=>headers.indexOf(name);
+
+    for(const required of ["date","side","lot","gross"]){
+      if(idx(required)===-1){
+        throw Error(`Kolom ${required} tidak ditemukan dalam CSV.`);
       }
-      if(confirm(`Import ${imported.length} trade(s) ke akun Supabase ini?`)){if(!currentUser)throw Error("Login terlebih dahulu.");const payload=imported.map(toDatabaseTrade);const {error}=await supabaseClient.from("trades").insert(payload);if(error)throw error;trades.push(...imported);render();showToast(`${imported.length} trade(s) imported to Supabase.`);}
-    }catch(err){alert("Import gagal: "+err.message);}
-    finally{$("csvFile").value="";}
-  });
+    }
+
+    const hasIdColumn=idx("id")!==-1;
+    const get=(row,name)=>idx(name)===-1?"":(row[idx(name)]??"").trim();
+
+    const numberValue=(row,name)=>{
+      const value=get(row,name);
+      if(value==="") return null;
+      const number=Number(value);
+      if(!Number.isFinite(number)) throw Error(`Nilai ${name} tidak valid.`);
+      return number;
+    };
+
+    const imported=[];
+    const existingIds=new Set(trades.map(t=>String(t.id)));
+    const existingFingerprints=new Set(trades.map(tradeFingerprint));
+
+    const batchIds=new Set();
+    const batchFingerprints=new Set();
+    let skipped=0;
+
+    for(const row of rows.slice(1)){
+      if(row.every(cell=>!String(cell??"").trim())) continue;
+
+      const trade={
+        id:get(row,"id") || crypto.randomUUID(),
+        date:get(row,"date"),
+        side:get(row,"side"),
+        status:get(row,"status") || "closed",
+        lot:numberValue(row,"lot"),
+        entry:numberValue(row,"entry"),
+        exit:numberValue(row,"exit"),
+        stopLoss:numberValue(row,"stopLoss"),
+        takeProfit:numberValue(row,"takeProfit"),
+        risk:numberValue(row,"risk"),
+        gross:numberValue(row,"gross"),
+        commission:numberValue(row,"commission") ?? 0,
+        swap:numberValue(row,"swap") ?? 0,
+        strategy:get(row,"strategy"),
+        session:get(row,"session"),
+        mood:get(row,"mood"),
+        notes:get(row,"notes")
+      };
+
+      if(!trade.date || !trade.side || trade.lot===null || trade.gross===null){
+        throw Error("Ada transaksi dengan tanggal, side, lot, atau gross yang kosong.");
+      }
+
+      const fingerprint=tradeFingerprint(trade);
+
+      const duplicate=hasIdColumn
+        ? existingIds.has(String(trade.id)) || batchIds.has(String(trade.id))
+        : existingFingerprints.has(fingerprint) || batchFingerprints.has(fingerprint);
+
+      if(duplicate){
+        skipped++;
+        continue;
+      }
+
+      imported.push(trade);
+      batchIds.add(String(trade.id));
+      batchFingerprints.add(fingerprint);
+    }
+
+    if(imported.length===0){
+      showToast(`Tidak ada transaksi baru. ${skipped} duplikat dilewati.`);
+      return;
+    }
+
+    if(confirm(`Import ${imported.length} transaksi baru? ${skipped} duplikat akan dilewati.`)){
+      const payload=imported.map(toDatabaseTrade);
+      const {error}=await supabaseClient.from("trades").insert(payload);
+
+      if(error) throw error;
+
+      trades.push(...imported);
+      render();
+      showToast(`${imported.length} transaksi berhasil diimport. ${skipped} duplikat dilewati.`);
+    }
+
+  }catch(err){
+    alert("Import gagal: "+err.message);
+  }finally{
+    $("csvFile").value="";
+  }
+});
   function parseCSV(text){
     const rows=[];let row=[],field="",quoted=false;
     for(let i=0;i<text.length;i++){
